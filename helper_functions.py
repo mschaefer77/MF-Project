@@ -155,3 +155,25 @@ def rolling_reg(response: pd.Series, regressors: pd.DataFrame, window: int, plot
         
     return betas_df
 
+def plot_drawdown(returns:pd.DataFrame)->None: 
+    """
+    Takes in a date-indexed dataframe with (possibly) multiple returns series and plots the drawdown of each series
+    """
+
+    plot_dataframe = pd.DataFrame(index=returns.index)
+    for col in returns.columns: 
+        cumulative = (1 + returns[col]).cumprod()
+        running_max = cumulative.cummax()
+        drawdowns = (cumulative - running_max) / running_max
+        plot_dataframe[col] = drawdowns
+    
+    
+    fig, ax = plt.subplots(figsize=(10,6))
+    for col in plot_dataframe.columns:
+        plot_dataframe.loc[:,col].plot(ax=ax, label=col)
+        plt.fill_between(plot_dataframe.index, plot_dataframe[col], alpha=0.2)
+    
+    plt.legend()
+    plt.title("Drawdown")
+    plt.tight_layout()
+    plt.show()
