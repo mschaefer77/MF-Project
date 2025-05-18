@@ -1,0 +1,12 @@
+
+yfinance
+pandas_datareader
+pandas
+numpy
+matplotlib
+plotly
+yahoofinancials
+seaborn
+statsmodels
+scipy
+scikit-learn
