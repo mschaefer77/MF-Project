@@ -444,10 +444,7 @@ class ComparisonBacktest:
     ):
         rets = self.returns
 
-        # 1) pooled mean across all returns
-        overall_mean = rets.stack().mean()
-
-        # 2) global bin edges and y‐limit
+        # global bin edges & y‐limit
         min_ret, max_ret = rets.min().min(), rets.max().max()
         bins_edges = np.linspace(min_ret, max_ret, bins + 1)
         max_count = max(
@@ -455,34 +452,35 @@ class ComparisonBacktest:
             for col in rets.columns
         )
 
-        # 3) subplot layout
+        # subplot layout
         n = len(rets.columns)
         ncols = cols_per_row
         nrows = math.ceil(n / ncols)
-        fig, axes = plt.subplots(
-            nrows, ncols,
-            figsize=figsize,
-            sharex=False, sharey=True
-        )
+        fig, axes = plt.subplots(nrows, ncols, figsize=figsize,
+                                 sharex=False, sharey=True)
         axes = axes.flatten()
 
         cmap = plt.get_cmap("tab10")
         xticks = np.linspace(min_ret, max_ret, n_xticks)
 
-        # 4) draw each histogram + the same overall‐mean line
         for idx, col in enumerate(rets.columns):
             ax = axes[idx]
             color = cmap(idx % cmap.N)
 
+            # histogram
             ax.hist(rets[col], bins=bins_edges, color=color)
+
+            # series‐specific mean line
+            mean_val = rets[col].mean()
             ax.axvline(
-                overall_mean,
+                mean_val,
                 color='black',
                 linestyle='--',
                 linewidth=1.5,
-                label=f'Overall mean ({overall_mean:.4%})'
+                label=f'Mean ({mean_val:.4%})'
             )
 
+            # labels, limits, legend
             ax.set_title(col, fontsize=10)
             ax.set_xlim(min_ret, max_ret)
             ax.set_ylim(0, max_count * 1.05)
@@ -491,11 +489,10 @@ class ComparisonBacktest:
             ax.set_ylabel("Frequency")
             ax.legend(loc='upper right', fontsize=8)
 
-        # 5) hide any empty subplots
+        # hide unused subplots
         for ax in axes[n:]:
             ax.set_visible(False)
 
-        # 6) super‐title + layout
         fig.suptitle("Return Distributions", fontsize=14)
         fig.tight_layout(rect=[0, 0.03, 1, 0.95])
         plt.show()
