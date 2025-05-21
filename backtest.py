@@ -4,6 +4,7 @@ import statsmodels.api as sm
 import matplotlib.pyplot as plt
 import seaborn as sns
 import requests
+import math
 
 def get_rfr(observation_start, observation_end):
     fred_api_key = '48ceac4c50be275b61c7a6445466d179'
@@ -393,3 +394,109 @@ class BacktestEngine:
         plt.xlabel('Daily Return')
         plt.ylabel('Frequency')
         plt.show()
+
+class ComparisonBacktest:
+    def __init__(self, df, return_cols):
+        """
+        df : DataFrame with 'date' + multiple return columns (daily returns)
+        return_cols : list of column‐names in df to compare
+        """
+        self.df = df.copy()
+        self.df['date'] = pd.to_datetime(self.df['date'])
+        self.df.set_index('date', inplace=True)
+        self.returns = self.df[return_cols].fillna(0)
+
+        # cumulative returns
+        self.cum_returns = (1 + self.returns).cumprod()
+
+        # drawdowns
+        self.rolling_max = self.cum_returns.cummax()
+        self.drawdowns = self.cum_returns / self.rolling_max - 1
+
+    def plot_cumulative_returns(self, figsize=(12,6), title="Cumulative Returns"):
+        plt.figure(figsize=figsize)
+        for col in self.cum_returns:
+            plt.plot(self.cum_returns.index, self.cum_returns[col], label=col)
+        plt.legend()
+        plt.title(title)
+        plt.xlabel("Date")
+        plt.ylabel("Cumulative Returns")
+        plt.tight_layout()
+        plt.show()
+
+    def plot_drawdowns(self, figsize=(12,6), title="Drawdown"):
+        plt.figure(figsize=figsize)
+        for col in self.drawdowns:
+            plt.plot(self.drawdowns.index, self.drawdowns[col], label=col)
+        plt.legend()
+        plt.title(title)
+        plt.xlabel("Date")
+        plt.ylabel("Drawdown")
+        plt.tight_layout()
+        plt.show()
+
+    def plot_return_distributions(
+        self,
+        bins=50,
+        figsize=(12,8),
+        cols_per_row=2,
+        n_xticks=5
+    ):
+        rets = self.returns
+
+        # 1) pooled mean across all returns
+        overall_mean = rets.stack().mean()
+
+        # 2) global bin edges and y‐limit
+        min_ret, max_ret = rets.min().min(), rets.max().max()
+        bins_edges = np.linspace(min_ret, max_ret, bins + 1)
+        max_count = max(
+            np.histogram(rets[col], bins=bins_edges)[0].max()
+            for col in rets.columns
+        )
+
+        # 3) subplot layout
+        n = len(rets.columns)
+        ncols = cols_per_row
+        nrows = math.ceil(n / ncols)
+        fig, axes = plt.subplots(
+            nrows, ncols,
+            figsize=figsize,
+            sharex=False, sharey=True
+        )
+        axes = axes.flatten()
+
+        cmap = plt.get_cmap("tab10")
+        xticks = np.linspace(min_ret, max_ret, n_xticks)
+
+        # 4) draw each histogram + the same overall‐mean line
+        for idx, col in enumerate(rets.columns):
+            ax = axes[idx]
+            color = cmap(idx % cmap.N)
+
+            ax.hist(rets[col], bins=bins_edges, color=color)
+            ax.axvline(
+                overall_mean,
+                color='black',
+                linestyle='--',
+                linewidth=1.5,
+                label=f'Overall mean ({overall_mean:.4%})'
+            )
+
+            ax.set_title(col, fontsize=10)
+            ax.set_xlim(min_ret, max_ret)
+            ax.set_ylim(0, max_count * 1.05)
+            ax.set_xticks(xticks)
+            ax.set_xlabel("Daily Return")
+            ax.set_ylabel("Frequency")
+            ax.legend(loc='upper right', fontsize=8)
+
+        # 5) hide any empty subplots
+        for ax in axes[n:]:
+            ax.set_visible(False)
+
+        # 6) super‐title + layout
+        fig.suptitle("Return Distributions", fontsize=14)
+        fig.tight_layout(rect=[0, 0.03, 1, 0.95])
+        plt.show()
+
